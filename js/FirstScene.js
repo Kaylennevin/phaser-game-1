@@ -2,12 +2,21 @@ class FirstScene extends Phaser.Scene {
     player;
     cursors;
     platforms;
+    gems;
+    bomb;
+    scoreText;
+    score = 0;
+    gameOver = false;
+
     constructor(config) {
         super(config);
     }
     preload() {
-        this.load.image("hills", "assets/hills.jpg");
+        this.load.image("hills", "assets/png/Background.png");
         this.load.image("ground-1600", "assets/platform-1600.png");
+        this.load.image("platform-100", "assets/platform-100.png");
+        this.load.image("gem", "assets/png/gem3.png");
+        this.load.image("bomb", "assets/bomb.png");
         this.load.spritesheet("dude", "assets/dude.png", {
             frameWidth:32,
             frameHeight:48
@@ -15,17 +24,64 @@ class FirstScene extends Phaser.Scene {
     }
 
     create() {
-        this.add.image(400,300,"hills");
+        this.cameras.main.setBounds(0,0,3400,600);
+        this.physics.world.setBounds(0,0,3400,600);
+        this.add.image(1700,600,"hills");
         this.player = this.physics.add.sprite(100, 450, "dude");
         this.player.setCollideWorldBounds(true);
+        this.cameras.main.startFollow(this.player,0.05,0.05);
         this.player.jumpCount = 0;
-        this.player.body.setBounce(0.5,0.5);
+        this.player.body.setVelocityY(0.5,0.5);
+        this.player.setSize(25,40).setOffset(3,8);
         this.cursors = this.input.keyboard.createCursorKeys();
 
         this.platforms = this.physics.add.staticGroup();
         this.platforms.create(800, 585, "ground-1600");
+        this.platforms.create(250, 500, "platform-100");
+        this.platforms.create(150, 400, "platform-100");
+        this.platforms.create(350, 275, "platform-100");
+        this.platforms.create(350, 150, "platform-100");
+        this.platforms.create(650, 110, "platform-100");
+        this.platforms.create(550, 110, "platform-100");
 
+        this.bombs = this.physics.add.group();
+        this.physics.add.collider(this.bombs, this.bombs);
+        this.physics.add.collider(this.bombs, this.platforms);
+        this.physics.add.overlap(this.bombs, this.player, this.endGame, null,this);
+        
+        this.gems = this.physics.add.group (
+            {
+                key: "gem",
+                repeat: 6,
+                setXY:  {
+                    X: 25,
+                    Y: 0,
+                    stepX: 150,
+                }
+            }
+        );
+
+        this.gems.children.iterate(
+            function(child){
+                child.setBounceY(Phaser.Math.FloatBetween(0.4,0.8));
+            }
+        );
+
+        // this.gems.scale.setTo(25,25);
+
+
+        this.physics.add.collider(this.gems, this.platforms);
         this.physics.add.collider(this.player, this.platforms);
+        this.physics.add.overlap(this.player, this.gems, this.collectGem, null, this);
+        this.scoreText = this.add.text(20,20,"Score: 0",
+        {
+            fontSize: "34px",
+            fill: "#000",
+            
+        }).setScrollFactor(0);
+
+        this.makeBomb();
+       
         
         this.anims.create({
             key: "left",
@@ -60,6 +116,7 @@ class FirstScene extends Phaser.Scene {
     }
 
     update() {
+        if(!this.gameOver) {
         if(this.cursors.left.isDown) {
             this.player.setVelocityX(-160);
             this.player.anims.play("left", true);
@@ -71,7 +128,7 @@ class FirstScene extends Phaser.Scene {
             this.player.setVelocityX(0);
             this.player.anims.play("idle", true);
         }
-        if(Phaser.Input.Keyboard.JustDown(this.cursors.space) && this.player.jumpCount < 2){
+        if(Phaser.Input.Keyboard.JustDown(this.cursors.space) && this.player.jumpCount < 1){
             this.player.jumpCount++;
             this.player.setVelocityY(-250);
 
@@ -79,7 +136,38 @@ class FirstScene extends Phaser.Scene {
         if (this.player.body.touching.down) {
             this.player.jumpCount = 0;
         }
-        
+        this.makeBomb();
+    }
+}
+   
+    collectGem(player, gem) {
+        gem.disableBody(true, true);
+        this.score += 17;
+        this.scoreText.setText("Score: " +this.score);
+        if(this.gems.countActive(true) === 0) {
+            this.gems.children.iterate(
+                function(child) {
+                    child.enableBody(true, child.x, 0, true, true);
+                }
+            )
+        }
+    }
+
+    makeBomb() {
+        //let x = (this.player.x < 600) ? Phaser.Math.Between(1200, 3400) : Phaser.Math.Between(0, 1200);
+        let x = Phaser.Math.Between(0, 3400);
+        let bomb = this.bombs.create(x, 16, "bomb");
+        bomb.setBounce(0.5);
+        bomb.setCollideWorldBounds(true);
+        bomb.setVelocity(0.5,0);
+
+    }
+
+    endGame() {
+        this.physics.pause();
+        this.player.setTint(0xff0000);
+        this.player.anims.play("turn");
     }
 
 }
+
